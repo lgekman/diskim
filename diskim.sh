@@ -36,8 +36,8 @@ cmd_env() {
 }
 
 ## Bootstrap commands;
-##	 kernel_unpack
-##	 kernel_build [--kcfg=config] [--menuconfig]
+##   kernel_unpack
+##   kernel_build [--kcfg=config] [--menuconfig]
 cmd_kernel_unpack() {
 	cmd_env
 	if test -e $__kdir; then
@@ -70,8 +70,8 @@ cmd_kernel_build() {
 	cp $__kobj/arch/x86_64/boot/bzImage $dir
 }
 
-##	 busybox_download
-##	 busybox_build [--bbcfg=config] [--menuconfig]
+##   busybox_download
+##   busybox_build [--bbcfg=config] [--menuconfig]
 cmd_busybox_download() {
 	local url ar
 	cmd_env
@@ -143,8 +143,8 @@ cmd_cprel() {
 ##
 ## Utility commands;
 
-##	 cplib --dest=dir [program...]
-##	   Copy libs that the commands needs (uses 'ldd').
+##   cplib --dest=dir [program...]
+##     Copy libs that the commands needs (uses 'ldd').
 cmd_cplib() {
 	test -n "$__dest" || die 'No --dest'
 	test -d "$__dest" || die "Not a directory [$__dest]"
