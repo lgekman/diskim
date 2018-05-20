@@ -1,0 +1,44 @@
+#! /bin/sh
+
+die() {
+	echo "ERROR: $*" > /dev/console
+	poweroff
+	exit 1
+}
+
+log() {
+	echo "LOG: $*" > /dev/console
+}
+
+grep -q mkimage= /proc/cmdline || exit 0
+eval $(grep -oE 'mkimage=[0-9a-f-]+' /proc/cmdline)
+
+log "Formatting image $mkimage..."
+touch /etc/mtab
+mke2fs -t ext4 -U $mkimage -E hash_seed=$mkimage -F /dev/vda || \
+	die "Failed; mke2fs"
+
+log "Mounting file systems..."
+mkdir /mnt /cd
+mount -t iso9660 -r /dev/vdb /cd || die "Failed to mount cd"
+mount -t ext4 /dev/vda /mnt || die "Failed to mount image"
+
+if test -r /cd/diskim; then
+	cp /cd/diskim /tmp
+	chmod +x /tmp/diskim
+	/tmp/diskim prepare
+fi
+
+cd /mnt
+for n in $(find /cd -name '[0-9]*' | sort); do
+	log "Untar [$n]..."
+	tar xf $n || die "Untar failed [$n]"
+done
+cd /
+
+test -x /tmp/diskim && /tmp/diskim cleanup
+
+umount /mnt
+umount /cd
+log SUCCESS
+poweroff
