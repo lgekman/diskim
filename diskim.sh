@@ -13,11 +13,7 @@
 ##
 ##   Create boot-strap kernel and initrd.cpio;
 ##
-##     ./diskim.sh kernel_unpack
-##     ./diskim.sh kernel_build
-##     ./diskim.sh busybox_download
-##     ./diskim.sh busybox_build
-##     ./diskim.sh initrd
+##     ./diskim.sh bootstrap
 ##
 ##   New images can now be created with the 'mkimage' command;
 ##
@@ -255,7 +251,7 @@ cmd_kill_kvm() {
 ##
 ##   Image commands;
 
-##     mkimage --image=file [--format=raw] [--size=2G] \
+##     mkimage --image=file [--format=qcow2] [--size=2G] \
 ##        [--uuid=uuid] [--script=file] [dir|cpio|tar...]
 ##       Create an image with the specified contents.
 cmd_mkimage() {
@@ -276,12 +272,12 @@ cmd_ximage() {
 }
 
 
-#   createimage --image=file [--size=2G] [--format=raw]
+#   createimage --image=file [--size=2G] [--format=qcow2]
 cmd_createimage() {
 	test -n "$__image" || die "No --image specified"
 	test -n "$__size" || __size=2G
 	test -n "$__uuid" || __uuid=$(uuid)
-	test -n "$__format" || __format=raw
+	test -n "$__format" || __format=qcow2
 	truncate --size=$__size "$__image" || die "Failed to create [$__image]"
 	mkdir -p $tmp
 	if ! mke2fs -t ext4 -U $__uuid -F $__image > $tmp/out 2>&1; then
