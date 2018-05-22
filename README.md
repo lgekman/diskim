@@ -45,6 +45,28 @@ here shown with it's default. Conclude the bootstrap with;
 ./diskim.sh busybox_build
 ./diskim.sh initrd
 ```
+## Test
+
+Create an image from the initrd used by the `diskim` vm;
+
+```
+test -n "$DISKIM_WORKSPACE" || export DISKIM_WORKSPACE=$HOME/tmp/diskim
+./diskim.sh mkimage --image=/tmp/hd.img $DISKIM_WORKSPACE/initrd.cpio
+```
+
+Now you can start a `kvm` using the image with;
+
+```
+./diskim.sh kvm --image=/tmp/hd.img root=/dev/vda
+# Or in an xterm;
+./diskim.sh xkvm --image=/tmp/hd.img root=/dev/vda
+```
+
+To terminate do `poweroff` in the VM console or do;
+
+```
+./diskim.sh kill_kvm
+```
 
 ## Create an image manually
 
