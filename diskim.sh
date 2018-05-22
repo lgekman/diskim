@@ -72,8 +72,29 @@ cmd_env() {
 }
 
 ##   Bootstrap commands;
-##     kernel_unpack
+##     bootstrap [--clean]
+##     kernel_download
 ##     kernel_build [--kcfg=config] [--menuconfig]
+
+cmd_bootstrap() {
+	cmd_kernel_download
+	cmd_kernel_build
+	cmd_busybox_download
+	cmd_busybox_build
+	cmd_initrd
+}
+
+cmd_kernel_download() {
+	cmd_env
+	local ar=$__kver.tar.xz
+	if test -r $ARCHIVE/$ar; then
+		echo "Already downloaded [$ar]"
+		return 0
+	fi
+	mkdir -p $ARCHIVE
+	local burl=https://mirrors.edge.kernel.org/pub/linux/kernel/v4.x
+	curl -L $burl/$ar > $ARCHIVE/$ar || die "Download failed"
+}
 cmd_kernel_unpack() {
 	cmd_env
 	if test -e $__kdir; then
@@ -87,6 +108,7 @@ cmd_kernel_unpack() {
 }
 cmd_kernel_build() {
 	cmd_env
+	cmd_kernel_unpack
 	mkdir -p $__kobj
 	if test -r $__kcfg; then
 		cp $__kcfg $__kobj/.config
@@ -162,12 +184,6 @@ cmd_emit_initrd() {
 	cp $bb $__dest/bin
 	ln -s busybox $__dest/bin/sh
 	cmd_cprel $ld
-	local f
-	for f in mke2fs strace; do
-		f=$(which $f)
-		test -x "$f" || die "Not executable [$f]"
-		cp $f $__dest/bin
-	done
 	cmd_cplib $__dest/bin/*
 	cd $__dest
 	find . | cpio -o -H newc
@@ -239,16 +255,12 @@ cmd_kill_kvm() {
 ##
 ##   Image commands;
 
-##     mkimage --image=file [--format=qcow2] [--size=2G] \
+##     mkimage --image=file [--format=raw] [--size=2G] \
 ##        [--uuid=uuid] [--script=file] [dir|cpio|tar...]
 ##       Create an image with the specified contents.
 cmd_mkimage() {
 	cmd_createimage
-	mkdir -p $tmp
-	__iso=$tmp/cd.iso
-	cmd_createiso $@
-	test -n "$__uuid" || __uuid=$(uuid)
-	cmd_kvm mkimage=$__uuid  2>&1 | grep -E 'LOG|ERROR'
+	cmd_ximage $@
 }
 
 ##     ximage --image=file [--script=file] [dir|cpio|tar...]
@@ -264,15 +276,25 @@ cmd_ximage() {
 }
 
 
-#   createimage --image=file [--format=qcow2] [--size=2G]
+#   createimage --image=file [--size=2G] [--format=raw]
 cmd_createimage() {
 	test -n "$__image" || die "No --image specified"
 	test -n "$__size" || __size=2G
-	test -n "$__format" || __format=qcow2
-	touch "$__image" 2> /dev/null || die "Not writable [$__image]"
-	rm -f "$__image"
-	qemu-img create -f $__format -o size=$__size $__image > /dev/null || \
-		die "Failed to create [$__image]"
+	test -n "$__uuid" || __uuid=$(uuid)
+	test -n "$__format" || __format=raw
+	truncate --size=$__size "$__image" || die "Failed to create [$__image]"
+	mkdir -p $tmp
+	if ! mke2fs -t ext4 -U $__uuid -F $__image > $tmp/out 2>&1; then
+		cat $tmp/out
+		die "Failed to format [$__image]"
+	fi
+	rm -f $tmp/out
+	if test "$__format" != "raw"; then
+		qemu-img convert -O $__format $__image $__image.qcow2 || \
+			die "Failed to convert to [$__format]"
+		rm -f $__image
+		mv $__image.qcow2 $__image
+	fi
 }
 
 #   createiso --iso=file [--script=file] [dir|cpio|tar...]
