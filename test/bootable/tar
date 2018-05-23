@@ -1,0 +1,21 @@
+#! /bin/sh
+
+prg=$(basename $0)
+dir=$(dirname $0); dir=$(readlink -f $dir)
+tmp=${TMPDIR:-/tmp}/${prg}_$$
+
+die() {
+	echo "ERROR: $*" >&2
+	rm -rf $tmp
+	exit 1
+}
+
+test -n "$1" || die 'No file'
+test -n "$DISKIM_WORKSPACE" || die 'Not set $DISKIM_WORKSPACE'
+kernel=$DISKIM_WORKSPACE/bzImage
+test -r $kernel || die "Not readable [$kernel]"
+
+mkdir -p $tmp
+cp -R $dir/rootfs/* $tmp
+ln -s $kernel $tmp/boot/bzImage
+tar -C $tmp --dereference -cf $1 boot

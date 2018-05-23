@@ -17,7 +17,7 @@
 ##
 ##   New images can now be created with the 'mkimage' command;
 ##
-##     ./diskim.sh mkimage /path/to/my/root
+##     ./diskim.sh mkimage --image=file /path/to/my/root
 ##
 ##   For test the boot-strap 'initrd.cpio' can be used to create an
 ##   image and boot a VM;
@@ -164,6 +164,22 @@ cmd_busybox_build() {
 	make -C $d -j4
 }
 
+##     syslinux_download
+syslinuxver=syslinux-6.03
+cmd_syslinux_download() {
+	cmd_env
+	local ar=$syslinuxver.tar.xz
+	test -r $ARCHIVE/$ar && return 0
+	local baseurl=https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux
+	curl -L $baseurl/$ar > $ARCHIVE/$ar
+}
+cmd_syslinux_unpack() {
+	cmd_env
+	test -d $DISKIM_WORKSPACE/$syslinuxver && return 0
+	tar -C $DISKIM_WORKSPACE -xf $ARCHIVE/$syslinuxver.tar.xz
+}
+
+
 #   emit_initrd > initrd.cpio
 #     Test with; diskim.sh emit_initrd | cpio -t
 cmd_emit_initrd() {
@@ -172,14 +188,20 @@ cmd_emit_initrd() {
 	test -x $bb || die "Not executable [$bb]"
 	local ld=/lib64/ld-linux-x86-64.so.2
 	test -x $ld || die "The loader not executable [$ld]"
-
+	local ld32=/lib/ld-linux.so.2
+	test -x $ld32 || die "The loader32 not executable [$ld32]"
+	local extlinux=$DISKIM_WORKSPACE/$syslinuxver/bios/extlinux/extlinux
+	test -x $extlinux || die "Not executable [$extlinux]"
+	
 	mkdir -p $tmp
 	cp -R $dir/rootfs $tmp
 	__dest=$tmp/rootfs
 	mkdir -p $__dest/bin
 	cp $bb $__dest/bin
 	ln -s busybox $__dest/bin/sh
+	cp $extlinux $__dest/bin
 	cmd_cprel $ld
+	cmd_cprel $ld32
 	cmd_cplib $__dest/bin/*
 	cd $__dest
 	find . | cpio -o -H newc
@@ -252,10 +274,11 @@ cmd_kill_kvm() {
 ##   Image commands;
 
 ##     mkimage --image=file [--format=qcow2] [--size=2G] \
-##        [--uuid=uuid] [--script=file] [dir|cpio|tar...]
+##        [--bootable] [--script=file] [dir|cpio|tar...]
 ##       Create an image with the specified contents.
 cmd_mkimage() {
 	cmd_createimage
+	test "$__bootable" = "yes" && xargs=bootable=yes
 	cmd_ximage $@
 }
 
@@ -268,7 +291,7 @@ cmd_ximage() {
 	mkdir -p $tmp
 	__iso=$tmp/cd.iso
 	cmd_createiso $@
-	cmd_kvm ximage  2>&1 | grep -E 'LOG|ERROR'
+	cmd_kvm "ximage $xargs" 2>&1 | grep -E 'LOG|ERROR'
 }
 
 
@@ -280,7 +303,7 @@ cmd_createimage() {
 	test -n "$__format" || __format=qcow2
 	truncate --size=$__size "$__image" || die "Failed to create [$__image]"
 	mkdir -p $tmp
-	if ! mke2fs -t ext4 -U $__uuid -F $__image > $tmp/out 2>&1; then
+	if ! mke2fs -t ext3 -U $__uuid -F $__image > $tmp/out 2>&1; then
 		cat $tmp/out
 		die "Failed to format [$__image]"
 	fi
@@ -331,7 +354,7 @@ cmd_tar() {
 
 	if test -d $n; then
 		if test -x $n/tar; then
-			$n/tar
+			$n/tar -
 		else
 			cd $n
 			tar --sparse -c *

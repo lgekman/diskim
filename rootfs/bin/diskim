@@ -1,0 +1,101 @@
+#! /bin/sh
+##
+## diskim --
+##   Help script for 'diskim';
+##   https://github.com/lgekman/diskim
+##
+##   This script executes on the VM started by 'diskim.sh'. It
+##   performs disk image tasks that require 'root' access and can make
+##   the image bootable.
+##
+##   Commands
+##   --------
+##
+
+prg=$(basename $0)
+dir=$(dirname $0); dir=$(readlink -f $dir)
+me=$dir/$prg
+tmp=${TMPDIR:-/tmp}/${prg}_$$
+
+die() {
+	echo "ERROR: $*" >&2
+	rm -rf $tmp
+	exit 1
+}
+help() {
+	grep '^##' $0 | cut -c3-
+	rm -rf $tmp
+	exit 0
+}
+log() {
+	echo "LOG: $*" > /dev/console
+}
+
+test -n "$1" || help
+echo "$1" | grep -qi "^help\|-h" && help
+
+##   mount
+cmd_mount() {
+	log "Mounting file systems..."
+	mkdir /mnt /cd
+	mount /dev/vda /mnt || die "Failed to mount image"
+	mount -t iso9660 -r /dev/vdb /cd || die "Failed to mount cd"
+}
+
+##   copy
+cmd_copy() {
+	if test -r /cd/diskim; then
+		cp /cd/diskim /tmp
+		chmod +x /tmp/diskim
+		/tmp/diskim prepare
+	fi
+
+	cd /mnt
+	for n in $(find /cd -name '[0-9]*' | sort); do
+		log "Untar [$n]..."
+		tar xf $n || die "Untar failed [$n]"
+	done
+	cd /
+
+	test -x /tmp/diskim && /tmp/diskim cleanup
+}
+
+##   bootable
+cmd_bootable() {
+	mkdir -p /mnt/boot
+	extlinux -i /mnt/boot
+}
+
+##   umount
+cmd_umount() {
+	umount /mnt
+	umount /cd
+}
+
+##
+# Get the command
+cmd=$1
+shift
+grep -q "^cmd_$cmd()" $0 || die "Invalid command [$cmd]"
+
+while echo "$1" | grep -q '^--'; do
+	if echo $1 | grep -q =; then
+		o=$(echo "$1" | cut -d= -f1 | sed -e 's,-,_,g')
+		v=$(echo "$1" | cut -d= -f2-)
+		eval "$o=\"$v\""
+	else
+		o=$(echo "$1" | sed -e 's,-,_,g')
+		eval "$o=yes"
+	fi
+	shift
+done
+unset o v
+long_opts=`set | grep '^__' | cut -d= -f1`
+
+# Execute command
+trap "die Interrupted" INT TERM
+#mkdir -p $tmp
+cmd_$cmd "$@"
+status=$?
+rm -rf $tmp
+exit $status
