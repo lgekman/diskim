@@ -1,6 +1,7 @@
 #! /bin/sh
 ##
 ## diskim.sh --
+##
 ##   Create a diskimage without 'root' or 'sudo' rights.
 ##
 ##   Kvm/qemu is used to format images and install boot-loader. This
@@ -54,7 +55,10 @@ test -n "$1" || help
 echo "$1" | grep -qi "^help\|-h" && help
 
 cmd_env() {
-	test -n "$DISKIM_WORKSPACE" || DISKIM_WORKSPACE=$HOME/tmp/diskim
+	test -n "$DISKIM_WORKSPACE" || DISKIM_WORKSPACE=$dir/tmp
+	test -n "$__kernel" || __kernel=$DISKIM_WORKSPACE/bzImage
+	test -n "$__initrd" || __initrd=$DISKIM_WORKSPACE/initrd.cpio
+	test "$cmd" = "mkimage" -o "$cmd" = "ximage" && return 0
 	test -n "$ARCHIVE" || ARCHIVE=$HOME/Downloads
 	mkdir -p $DISKIM_WORKSPACE $ARCHIVE
 	test -n "$__kver" || __kver=linux-4.16.9
@@ -63,8 +67,17 @@ cmd_env() {
 	test -n "$__kobj" || __kobj=$DISKIM_WORKSPACE/obj
 	test -n "$__bbver" || __bbver=busybox-1.28.1
 	test -n "$__bbcfg" || __bbcfg=$dir/config/$__bbver
-	test -n "$__kernel" || __kernel=$DISKIM_WORKSPACE/bzImage
-	test -n "$__initrd" || __initrd=$DISKIM_WORKSPACE/initrd.cpio
+}
+
+cmd_release() {
+	test -n "$__version" || die "No version"
+	test -n "$1" || die "No out file"
+	cmd_env
+	local d=$tmp/diskim-$__version
+	mkdir -p $d/tmp
+	cp -R $me $dir/README.md $dir/test $d
+	cp $__kernel $__initrd $d/tmp
+	tar -C $tmp -cf "$1" diskim-$__version
 }
 
 ##   Bootstrap commands;
@@ -343,6 +356,17 @@ cmd_collect() {
 		b=$(basename $n | grep -oE '^[^.]+')
 		f=$(printf '%02d%s.tar' $i $b)
 		cmd_tar $n > "$__outdir/$f"
+	done
+}
+#   merge --outdir=dir [dir|cpio|tar...]
+cmd_merge() {
+	test "$__outdir" || die 'Not specified; --outdir'
+	test -d "$__outdir" || die "Not a directory [$__outdir]"
+	local n b f
+	for n in $@; do
+		test -r "$n" || die "Not readable [$n]"
+		i=$((i+1))
+		cmd_tar $n | tar -C "$__outdir" -x
 	done
 }
 #   tar <dir|tar|cpio>
