@@ -2,20 +2,12 @@
 
 Create disk images for VMs without root or sudo.
 
-Example;
-
 ```bash
 ./diskim.sh mkimage --image=/tmp/hd.img /path/to/your/source/dir
 ```
 
-If you plan to work on the same image for some time it is convenient
-to set the `$__image` variable instead of specifying the parameter all
-the time;
-
-```bash
-export __image=/tmp/hd.img
-./diskim.sh mkimage /path/to/your/source/dir
-```
+This will create a `qcow2` disk image with the contents from your
+source dir.
 
 An important feature of `diskim` is that you can specify multiple
 sources for the image;
@@ -28,61 +20,25 @@ sources for the image;
 The sources can be a directory, a tar-file or a cpio file. The sources
 will be copied in order to your image.
 
-### Custom tar
+## Dependencies
 
-Very often you want to include files that are not in your directory,
-wor instance a tool from your host (e.g. `strace`). In `diskim` you
-can create an executable script called `tar` in your directory and
-`diskim` will use that script to create a tar-file that will be
-unpacked on you image. Please see
-[test/bootable/tar](test/bootable/tar) for an example.
-
-
-## Build from source
-
-`diskim` use a (kvm) VM to do things that normally requires `sudo`,
-like mounting and for making the disk image bootable. So before
-`diskim` can be used you must build a kernel and a initrd for the VM.
-
-You can use;
+`Diskim` will start a VM so `kvm` must be installed on the machine. On
+Ubuntu do something like;
 
 ```
-export DISKIM_WORKSPACE=$HOME/tmp/diskim
-./diskim.sh bootstrap
+sudo apt install qemu-kvm
+sudo usermod -a -G kvm $USER
 ```
 
-### Boot-strap step-by-step
+## Build
 
-If you want more control.
+Please see the [build instruction](BUILD.md).
 
-First download the Linux kernel 4.16.9 source and
-[busybox](https://busybox.net/) 1.28.1 source. These should be
-downloaded to the $ARCHIVE directory which defaults to
-`$HOME/Downloads`. Do it manually or use;
+### Self image
 
-```bash
-./diskim.sh kernel_download
-./diskim.sh busybox_download
-```
-
-The kernel and initrd will be built at $DISKIM_WORKSPACE;
-
-```
-export DISKIM_WORKSPACE=$HOME/tmp/diskim
-```
-
-Conclude the bootstrap with;
-
-```
-./diskim.sh kernel_build
-./diskim.sh busybox_build
-./diskim.sh initrd
-```
-
-
-### Test
-
-Create an image from the initrd used by the `diskim` vm;
+Create an image from the initrd used by `diskim` itself. Since
+`diskim` is implemented using a disk image you may use it as an
+example;
 
 ```
 test -n "$DISKIM_WORKSPACE" || export DISKIM_WORKSPACE=$PWD/tmp
@@ -103,12 +59,43 @@ To terminate do `poweroff` in the VM console or do;
 ./diskim.sh kill_kvm
 ```
 
-#### Test a bootable image
+## Advanced operation and utilities
+
+### Set default options
+
+If you plan to work on the same image for some time it is convenient
+to set the `$__image` variable instead of specifying the parameter all
+the time;
+
+```bash
+export __image=/tmp/hd.img
+./diskim.sh mkimage /path/to/your/source/dir
+```
+
+### Custom tar
+
+Very often you want to include files that are not in your directory,
+wor instance a tool from your host (e.g. `strace`). In `diskim` you
+can create an executable script called `tar` in your directory and
+`diskim` will use that script to create a tar-file that will be
+unpacked on you image. Please see
+[test/bootable/tar](test/bootable/tar) for an example.
+
+### Bootable image
+
+`Diskim` uses the
+[extlinux](https://www.syslinux.org/wiki/index.php?title=EXTLINUX)
+boot loader to create bootable images. Use the `--bootable`
+option. Note that you must install a Linux kernel and `extlinux.conf`
+on the image. Please see [test/bootable/tar](test/bootable/tar) for an
+example.
 
 ```
 ./diskim.sh mkimage --image=/tmp/hd.img --bootable \
   $DISKIM_WORKSPACE/initrd.cpio ./test/bootable
 ```
+
+Test with;
 
 ```
 qemu-system-x86_64 -enable-kvm --nographic -smp 2 \
@@ -118,8 +105,11 @@ qemu-system-x86_64 -enable-kvm --nographic -smp 2 \
 
 ## Create an image manually
 
-To create an image is really quite easy. First create an empty
-file;
+If you don't like `diskim` or need some feature not supported you may
+want to create an image manually. It is really quite easy, but you
+will need `sudo`.
+
+First create an empty file;
 
 ```bash
 truncate /tmp/hd.img --size=2G
@@ -147,15 +137,21 @@ mkdir /tmp/mnt
 sudo mount -t ext3 -o loop /tmp/hd.img /tmp/mnt
 sudo chmod 777 /tmp/mnt
 # (copy files to /tmp/mnt)
-sudo umount /tmp/mnt
 ```
 
-Before unmounting you can make the image bootable with `extlinux`;
+Before unmounting you can make the image bootable with
+`extlinux`;
 
 ```
 mkdir /tmp/mnt/boot
 # (copy a kernel and extlinux.conf to /tmp/mnt/boot)
 sudo extlinux -i /tmp/mnt/boot
+```
+
+Unmount the image;
+
+```
+sudo umount /tmp/mnt
 ```
 
 Now you can convert the `raw` image to other formats if you like, for
