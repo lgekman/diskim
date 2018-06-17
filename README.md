@@ -34,15 +34,14 @@ sudo usermod -a -G kvm $USER
 
 Please see the [build instruction](BUILD.md).
 
-### Self image
+## Self image
 
 Create an image from the initrd used by `diskim` itself. Since
 `diskim` is implemented using a disk image you may use it as an
 example;
 
 ```
-test -n "$DISKIM_WORKSPACE" || export DISKIM_WORKSPACE=$PWD/tmp
-./diskim.sh mkimage --image=/tmp/hd.img $DISKIM_WORKSPACE/initrd.cpio
+./diskim.sh mkimage --image=/tmp/hd.img ./tmp/initrd.cpio
 ```
 
 Now you can start a `kvm` using the image with;
