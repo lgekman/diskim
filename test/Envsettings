@@ -1,0 +1,17 @@
+#! /bin/sh
+if ! test -r ./test/Envsettings; then
+	echo "Must be sourced from the 'diskim' directory"
+	return 1
+fi
+
+export DISKIM_DIR=$(readlink -f .)
+alias diskim=$DISKIM_DIR/diskim.sh
+
+test -n "$DISKIM_WORKSPACE" || export DISKIM_WORKSPACE=$HOME/tmp/diskim
+if ! test -d "$DISKIM_WORKSPACE"; then
+	echo "Init DISKIM_WORKSPACE=$DISKIM_WORKSPACE"
+	mkdir -p $(dirname $DISKIM_WORKSPACE)
+	cp -r $DISKIM_DIR/tmp $DISKIM_WORKSPACE
+fi
+
+

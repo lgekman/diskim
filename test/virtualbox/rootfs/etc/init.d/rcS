@@ -1,0 +1,5 @@
+#! /bin/sh
+
+for n in $(find /etc/init.d -name '[0-9]*' | sort); do
+	test -x $n && $n start
+done

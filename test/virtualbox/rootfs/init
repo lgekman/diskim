@@ -1,0 +1,9 @@
+#! /bin/sh
+/bin/busybox mkdir -p /sbin /var/log /var/run /proc /sys /tmp /dev
+/bin/busybox --install -s
+
+mount -t sysfs sysfs /sys
+mount -t proc procfs /proc
+mdev -s
+
+exec /sbin/init
