@@ -4,26 +4,15 @@
 ##
 ##   Create a diskimage without 'root' or 'sudo' rights.
 ##
-##   Kvm/qemu is used to format images and install boot-loader. This
-##   requires a "boot-strap" image (or rather initrd.cpio) and kernel
-##   that in turn is used to create other images.
-##
-##   The directory where the boot-strap items are is configured in;
-##
-##     export DISKIM_WORKSPACE=$HOME/tmp/diskim
-##
-##   Create boot-strap kernel and initrd.cpio;
-##
-##     ./diskim.sh bootstrap
-##
-##   New images can now be created with the 'mkimage' command;
+##   Images can be created with the 'mkimage' command;
 ##
 ##     ./diskim.sh mkimage --image=file /path/to/my/root
+##     ./diskim.sh mkimage --image=file /path/to/base [/path/to/ovl...]
 ##
-##   For test the boot-strap 'initrd.cpio' can be used to create an
+##   For test the internal 'initrd.cpio' can be used to create an
 ##   image and boot a VM;
 ##
-##     ./diskim.sh mkimage --image=/tmp/hd.img $DISKIM_WORKSPACE/initrd.cpio
+##     ./diskim.sh mkimage --image=/tmp/hd.img ./tmp/initrd.cpio
 ##     ./diskim.sh kvm --image=/tmp/hd.img root=/dev/vda
 ##     ./diskim.sh xkvm --image=/tmp/hd.img root=/dev/vda  # (uses "xterm")
 ##
@@ -77,6 +66,8 @@ cmd_release() {
 	mkdir -p $d/tmp
 	cp -R $me $dir/README.md $dir/test $d
 	cp $__kernel $__initrd $d/tmp
+	mkdir -p $d/tmp/$__bbver
+	cp $DISKIM_WORKSPACE/$__bbver/busybox $d/tmp/$__bbver
 	tar -C $tmp -cf "$1" diskim-$__version
 }
 
@@ -87,9 +78,11 @@ cmd_release() {
 
 cmd_bootstrap() {
 	cmd_kernel_download
-	cmd_kernel_build
 	cmd_busybox_download
+	cmd_syslinux_download
+	cmd_kernel_build
 	cmd_busybox_build
+	cmd_syslinux_unpack
 	cmd_initrd
 }
 
@@ -141,6 +134,7 @@ cmd_kernel_build() {
 
 ##     busybox_download
 ##     busybox_build [--bbcfg=config] [--menuconfig]
+##     busybox_install --dest=dir
 cmd_busybox_download() {
 	local url ar
 	cmd_env
@@ -176,8 +170,22 @@ cmd_busybox_build() {
 
 	make -C $d -j4
 }
+cmd_busybox_install() {
+	test -n "$__dest" || die "No --dest"
+	cmd_env
+	local bb=$DISKIM_WORKSPACE/$__bbver/busybox
+	test -x $bb || die "Not executable [$bb]"
+	local ld=/lib64/ld-linux-x86-64.so.2
+	test -x $ld || die "The loader not executable [$ld]"
+	mkdir -p $__dest/bin
+	cp $bb $__dest/bin
+	ln -s busybox $__dest/bin/sh
+	cmd_cprel $ld
+	cmd_cplib $__dest/bin/*
+}
 
 ##     syslinux_download
+##     syslinux_unpack
 syslinuxver=syslinux-6.03
 cmd_syslinux_download() {
 	cmd_env
@@ -197,23 +205,16 @@ cmd_syslinux_unpack() {
 #     Test with; diskim.sh emit_initrd | cpio -t
 cmd_emit_initrd() {
 	cmd_env
-	local bb=$DISKIM_WORKSPACE/$__bbver/busybox
-	test -x $bb || die "Not executable [$bb]"
-	local ld=/lib64/ld-linux-x86-64.so.2
-	test -x $ld || die "The loader not executable [$ld]"
 	local ld32=/lib/ld-linux.so.2
 	test -x $ld32 || die "The loader32 not executable [$ld32]"
 	local extlinux=$DISKIM_WORKSPACE/$syslinuxver/bios/extlinux/extlinux
 	test -x $extlinux || die "Not executable [$extlinux]"
-	
-	mkdir -p $tmp
-	cp -R $dir/rootfs $tmp
+
 	__dest=$tmp/rootfs
-	mkdir -p $__dest/bin
-	cp $bb $__dest/bin
-	ln -s busybox $__dest/bin/sh
+	cmd_busybox_install
+	
+	cp -R $dir/rootfs $tmp
 	cp $extlinux $__dest/bin
-	cmd_cprel $ld
 	cmd_cprel $ld32
 	cmd_cplib $__dest/bin/*
 	cd $__dest

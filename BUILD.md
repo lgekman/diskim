@@ -36,6 +36,7 @@ downloaded to the $ARCHIVE directory which defaults to
 ```bash
 ./diskim.sh kernel_download
 ./diskim.sh busybox_download
+./diskim.sh syslinux_download
 ```
 
 Conclude the bootstrap with;
@@ -43,6 +44,41 @@ Conclude the bootstrap with;
 ```
 ./diskim.sh kernel_build
 ./diskim.sh busybox_build
+./diskim.sh syslinux_unpack
 ./diskim.sh initrd
 ```
 
+
+## Release
+
+Make a test-version;
+
+```
+ver=v0.2.0
+cd /tmp
+rm -rf diskim-$ver
+diskim release --version=$ver - | tar x
+```
+
+In a fresh shell;
+
+```
+ver=v0.2.0
+cd /tmp/diskim-$ver
+./diskim.sh mkimage --image=/tmp/hd.img ./tmp/initrd.cpio
+./diskim.sh xkvm --image=/tmp/hd.img root=/dev/vda
+export DISKIM_WORKSPACE=/tmp/$USER/diskim
+rm -rf $DISKIM_WORKSPACE
+. ./test/Envsettings
+# Test VirtualBox...
+```
+
+When done testing;
+
+```
+ver=v0.2.0
+./diskim.sh release --version=$ver /tmp/diskim-$ver.tar
+pxz /tmp/diskim-$ver.tar
+git tag -a $ver
+git push origin $ver
+```

@@ -30,11 +30,7 @@ sudo apt install qemu-kvm
 sudo usermod -a -G kvm $USER
 ```
 
-## Build
-
-Please see the [build instruction](BUILD.md).
-
-## Self image
+## Quick start
 
 Create an image from the initrd used by `diskim` itself. Since
 `diskim` is implemented using a disk image you may use it as an
@@ -57,6 +53,15 @@ To terminate do `poweroff` in the VM console or do;
 ```
 ./diskim.sh kill_kvm
 ```
+
+## Build
+
+Please see the [build instruction](BUILD.md).
+
+## Test and examples
+
+See the [test instruction](test/TEST.md).
+
 
 ## Advanced operation and utilities
 
