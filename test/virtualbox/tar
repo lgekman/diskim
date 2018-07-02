@@ -27,3 +27,5 @@ make -C $__kobj INSTALL_MOD_PATH=$tmp modules_install 1>&2 || \
 rm -f $(find $tmp/lib -type l)
 cd $tmp
 tar --dereference -cf $1 *
+cd - > /dev/null
+rm -rf $tmp
