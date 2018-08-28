@@ -51,6 +51,7 @@ cmd_copy() {
 	fi
 
 	cd /mnt
+	export EXTRACT_UNSAFE_SYMLINKS=1
 	for n in $(find /cd -name '[0-9]*' | sort); do
 		log "Untar [$n]..."
 		tar xf $n || die "Untar failed [$n]"
