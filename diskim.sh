@@ -85,7 +85,6 @@ cmd_bootstrap() {
 	cmd_syslinux_unpack
 	cmd_initrd
 }
-
 cmd_kernel_download() {
 	cmd_env
 	local ar=$__kver.tar.xz
@@ -94,7 +93,8 @@ cmd_kernel_download() {
 		return 0
 	fi
 	mkdir -p $ARCHIVE
-	local burl=https://mirrors.edge.kernel.org/pub/linux/kernel/v4.x
+	local kbase=$(echo $__kver | cut -d '.' -f1 | sed -e 's,linux-,v,')
+	local burl=https://cdn.kernel.org/pub/linux/kernel/$kbase.x
 	curl -L $burl/$ar > $ARCHIVE/$ar || die "Download failed"
 }
 cmd_kernel_unpack() {
