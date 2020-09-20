@@ -29,7 +29,7 @@ Bootstrap is building the kernel and initrd used by `diskim`;
 If that doesn't work or if you want more control, do it step-by-step;
 
 First download the Linux kernel 4.16.9 source and
-[busybox](https://busybox.net/) 1.28.1 source. These should be
+[busybox](https://busybox.net/) 1.32.0 source. These should be
 downloaded to the $ARCHIVE directory which defaults to
 `$HOME/Downloads`. Do it manually or use;
 
@@ -78,7 +78,7 @@ When done testing;
 ```
 ver=v0.2.0
 ./diskim.sh release --version=$ver /tmp/diskim-$ver.tar
-pxz /tmp/diskim-$ver.tar
+xz /tmp/diskim-$ver.tar
 git tag -a $ver
 git push origin $ver
 ```

@@ -54,7 +54,7 @@ cmd_env() {
 	test -n "$__kdir" || __kdir=$DISKIM_WORKSPACE/$__kver
 	test -n "$__kcfg" || __kcfg=$dir/config/$__kver
 	test -n "$__kobj" || __kobj=$DISKIM_WORKSPACE/obj
-	test -n "$__bbver" || __bbver=busybox-1.28.1
+	test -n "$__bbver" || __bbver=busybox-1.32.0
 	test -n "$__bbcfg" || __bbcfg=$dir/config/$__bbver
 }
 
