@@ -106,7 +106,7 @@ cmd_kernel_unpack() {
 	fi
 	local ar=$ARCHIVE/$__kver.tar.xz
 	test -r $ar || die "Not readable [$ar]"
-	tar -C $(dirname $__kdir) -I pxz -xf $ar
+	tar -C $(dirname $__kdir) -xf $ar
 }
 cmd_kernel_build() {
 	cmd_env
