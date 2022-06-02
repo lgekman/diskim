@@ -32,13 +32,19 @@ tmp=${TMPDIR:-/tmp}/${prg}_$$
 
 die() {
 	echo "ERROR: $*" >&2
-	rm -rf $tmp
+	rmtmp
 	exit 1
 }
 help() {
 	grep '^##' $0 | cut -c3-
-	rm -rf $tmp
+	rmtmp
 	exit 0
+}
+rmtmp() {
+	if test -d $tmp; then
+		chmod -R u+rw $tmp
+		rm -rf $tmp
+	fi
 }
 test -n "$1" || help
 echo "$1" | grep -qi "^help\|-h" && help
@@ -402,6 +408,7 @@ cmd_tar() {
 
 	tar --sparse -c *
 	cd - > /dev/null
+	chmod -R u+rw $tmp
 	rm -rf $tmp/tar
 }
 
@@ -430,5 +437,5 @@ trap "die Interrupted" INT TERM
 #mkdir -p $tmp
 cmd_$cmd "$@"
 status=$?
-rm -rf $tmp
+rmtmp
 exit $status

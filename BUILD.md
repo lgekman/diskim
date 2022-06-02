@@ -79,6 +79,6 @@ When done testing;
 ver=0.5.0
 ./diskim.sh release --version=$ver /tmp/diskim-$ver.tar
 xz /tmp/diskim-$ver.tar
-git tag -a $ver
+git tag $ver
 git push origin $ver
 ```
