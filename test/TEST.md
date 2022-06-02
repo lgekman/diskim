@@ -1,16 +1,19 @@
-diskim - test and examples
-==========================
+# diskim - test and examples
 
 First setup the `diskim` environment for test;
 
 ```
-export DISKIM_WORKSPACE=$HOME/tmp/diskom
+export DISKIM_WORKSPACE=$HOME/tmp/diskim
 . ./test/Envsettings
 ```
 
 You can set `$DISKIM_WORKSPACE` to another directory, the example
 shows the default.
 
+If you don't use a `diskim` release you must [build locally](../BUILD.md);
+```
+./diskim.sh bootstrap
+```
 
 ## Self image
 
@@ -44,12 +47,9 @@ does not support `qcow2` or `raw` disk format, but `qcow` is
 fine. Setup and build the kernel;
 
 ```
-export __kver=linux-4.17.3
-export __kcfg=$DISKIM_DIR/test/virtualbox/linux-4.17.3
+export __kver=linux-5.18.1
+export __kcfg=$DISKIM_DIR/test/virtualbox/$__kver
 export __kobj=$DISKIM_WORKSPACE/test/virtualbox/obj
-export __bootable=yes
-export __image=$DISKIM_WORKSPACE/test/virtualbox/hd.qcow
-export __format=qcow
 diskim kernel_download
 diskim kernel_unpack
 diskim kernel_build --kernel=$__kobj/bzImage
@@ -58,8 +58,14 @@ diskim kernel_build --kernel=$__kobj/bzImage
 Create the image;
 
 ```
-diskim mkimage  $DISKIM_DIR/test/virtualbox
+diskim mkimage --bootable --format=qcow \
+  --image=/tmp/hd-vbox.qcow $DISKIM_DIR/test/virtualbox
 ```
 
-Create a VM and add the image in the `Storage` configuration as `SATA`
-type `AHCI`.
+Create a VM in `VirtualBox` and add the image in the `Storage`
+configuration named `SATA` type `AHCI`.
+
+You can also test with `kvm`;
+```
+qemu-system-x86_64 -M q35 -enable-kvm -smp 2 -drive file=/tmp/hd-vbox.qcow
+```

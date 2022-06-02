@@ -50,12 +50,13 @@ cmd_env() {
 	test "$cmd" = "mkimage" -o "$cmd" = "ximage" && return 0
 	test -n "$ARCHIVE" || ARCHIVE=$HOME/Downloads
 	mkdir -p $DISKIM_WORKSPACE $ARCHIVE
-	test -n "$__kver" || __kver=linux-4.16.9
+	test -n "$__kver" || __kver=linux-5.18.1
 	test -n "$__kdir" || __kdir=$DISKIM_WORKSPACE/$__kver
 	test -n "$__kcfg" || __kcfg=$dir/config/$__kver
 	test -n "$__kobj" || __kobj=$DISKIM_WORKSPACE/obj
-	test -n "$__bbver" || __bbver=busybox-1.32.0
+	test -n "$__bbver" || __bbver=busybox-1.35.0
 	test -n "$__bbcfg" || __bbcfg=$dir/config/$__bbver
+	test "$cmd" = "env" && set | grep -E '^(__.*|ARCHIVE|DISKIM_WORKSPACE)='
 }
 
 cmd_release() {
@@ -111,6 +112,7 @@ cmd_kernel_unpack() {
 cmd_kernel_build() {
 	cmd_env
 	cmd_kernel_unpack
+	test "$__clean" = "yes" && rm -rf $__kobj
 	mkdir -p $__kobj
 	if test -r $__kcfg; then
 		cp $__kcfg $__kobj/.config
@@ -126,7 +128,7 @@ cmd_kernel_build() {
 		make -C $__kdir O=$__kobj oldconfig
 	fi
 
-	make -C $__kdir O=$__kobj -j4 || die "Failed to build kernel"
+	make -C $__kdir O=$__kobj -j$(nproc) || die "Failed to build kernel"
 	mkdir -p $(dirname $__kernel)
 	rm -f $__kernel
 	ln $__kobj/arch/x86/boot/bzImage $__kernel
@@ -149,6 +151,7 @@ cmd_busybox_download() {
 cmd_busybox_build() {
 	cmd_env
 	local d=$DISKIM_WORKSPACE/$__bbver
+	test "$__clean" = "yes" && rm -rf $d
 	if ! test -d $d; then
 		cmd_busybox_download
 		tar -C $DISKIM_WORKSPACE -xf $ARCHIVE/$__bbver.tar.bz2 ||\
@@ -168,7 +171,7 @@ cmd_busybox_build() {
 		make -C $d oldconfig
 	fi
 
-	make -C $d -j4
+	make -C $d -j$(nproc)
 }
 cmd_busybox_install() {
 	test -n "$__dest" || die "No --dest"

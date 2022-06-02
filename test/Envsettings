@@ -11,7 +11,7 @@ test -n "$DISKIM_WORKSPACE" || export DISKIM_WORKSPACE=$HOME/tmp/diskim
 if ! test -d "$DISKIM_WORKSPACE"; then
 	echo "Init DISKIM_WORKSPACE=$DISKIM_WORKSPACE"
 	mkdir -p $(dirname $DISKIM_WORKSPACE)
-	cp -r $DISKIM_DIR/tmp $DISKIM_WORKSPACE
+	test -d ./tmp && cp -r ./tmp $DISKIM_WORKSPACE
 fi
 
 

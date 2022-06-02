@@ -1,5 +1,8 @@
 # diskim
 
+This description assumes that a release is used. If you clone `diskim`
+you must [build it locally](BUILD.md).
+
 Create disk images for VMs without root or sudo.
 
 ```bash
@@ -26,6 +29,8 @@ will be copied in order to your image.
 Ubuntu do something like;
 
 ```
+kvm-ok
+# If needed;
 sudo apt install qemu-kvm
 sudo usermod -a -G kvm $USER
 ```
@@ -60,7 +65,8 @@ Please see the [build instruction](BUILD.md).
 
 ## Test and examples
 
-See the [test instruction](test/TEST.md).
+See the [test instruction](test/TEST.md). A
+[VirtualBox](https://www.virtualbox.org/) example is included.
 
 
 ## Advanced operation and utilities
