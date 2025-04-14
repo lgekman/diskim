@@ -302,12 +302,23 @@ cmd_createimage() {
 	test -n "$__size" || __size=2G
 	test -n "$__uuid" || __uuid=$(uuid)
 	test -n "$__format" || __format=qcow2
+	test -n "$__fs" || __fs=ext3
 	truncate --size=$__size "$__image" || die "Failed to create [$__image]"
 	mkdir -p $tmp
-	if ! mke2fs -t ext3 -U $__uuid -F $__image > $tmp/out 2>&1; then
-		cat $tmp/out
-		die "Failed to format [$__image]"
-	fi
+	case $__fs in
+		ext3)
+			if ! mke2fs -t ext3 -U $__uuid -F $__image > $tmp/out 2>&1; then
+				cat $tmp/out
+				die "Failed to format [$__image]"
+			fi
+			;;
+		*)
+			if ! mkfs.$__fs $__image > $tmp/out 2>&1; then
+				cat $tmp/out
+				die "Failed to format [$__image]"
+			fi
+			;;
+	esac
 	rm -f $tmp/out
 	if test "$__format" != "raw"; then
 		qemu-img convert -O $__format $__image $__image.qcow2 || \
