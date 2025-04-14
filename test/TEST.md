@@ -1,18 +1,19 @@
 # diskim - test and examples
 
-First setup the `diskim` environment for test;
+There are two cases:
 
-```
-export DISKIM_WORKSPACE=$HOME/tmp/diskim
-. ./test/Envsettings
-```
+1. You test a local build
+2. You test a release tar-file
 
-You can set `$DISKIM_WORKSPACE` to another directory, the example
-shows the default.
+Make sure not to mix these! If you test a local build, the defaults
+will do, but when testing a release tar-file make sure to set the
+`$DISKIM_WORKSPACE` to a temporary directory for testing.
 
-If you don't use a `diskim` release you must [build locally](../BUILD.md);
+For testing a release:
 ```
-./diskim.sh bootstrap
+export DISKIM_WORKSPACE=/tmp/tmp/$USER/diskim-test
+rm -rf $DISKIM_WORKSPACE
+cp -r ./tmp $DISKIM_WORKSPACE
 ```
 
 ## Self image
@@ -22,19 +23,18 @@ Create an image from the initrd used by `diskim` itself. Since
 example;
 
 ```
+eval $(./diskim.sh env | grep DISKIM_WORKSPACE)
 ./diskim.sh mkimage --image=/tmp/hd.img $DISKIM_WORKSPACE/initrd.cpio
 ```
 
-Now you can start a `kvm` using the image with;
-
+Now you can start a `kvm` using the image with:
 ```
 ./diskim.sh kvm --image=/tmp/hd.img root=/dev/vda
 # Or in an xterm;
 ./diskim.sh xkvm --image=/tmp/hd.img root=/dev/vda
 ```
 
-To terminate do `poweroff` in the VM console or do;
-
+To terminate do `poweroff` in the VM console or do:
 ```
 ./diskim.sh kill_kvm
 ```
@@ -47,19 +47,17 @@ does not support `qcow2` or `raw` disk format, but `qcow` is
 fine. Setup and build the kernel;
 
 ```
-export __kver=linux-5.18.1
-export __kcfg=$DISKIM_DIR/test/virtualbox/$__kver
+# (download the kernel source archive if necessary)
+export __kver=linux-6.14.2
+export __kcfg=$PWD/test/virtualbox/$__kver
 export __kobj=$DISKIM_WORKSPACE/test/virtualbox/obj
-diskim kernel_download
-diskim kernel_unpack
-diskim kernel_build --kernel=$__kobj/bzImage
+./diskim.sh kernel_build --kernel=$__kobj/bzImage
 ```
 
 Create the image;
 
 ```
-diskim mkimage --bootable --format=qcow \
-  --image=/tmp/hd-vbox.qcow $DISKIM_DIR/test/virtualbox
+./diskim.sh mkimage --bootable --format=qcow --image=/tmp/hd-vbox.qcow test/virtualbox
 ```
 
 Create a VM in `VirtualBox` and add the image in the `Storage`

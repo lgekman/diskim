@@ -40,6 +40,9 @@ help() {
 	rmtmp
 	exit 0
 }
+log() {
+	echo "$*" >&2
+}
 rmtmp() {
 	if test -d $tmp; then
 		chmod -R u+rw $tmp
@@ -49,83 +52,89 @@ rmtmp() {
 test -n "$1" || help
 echo "$1" | grep -qi "^help\|-h" && help
 
+findf() {
+	f=$HOME/Downloads/$1
+	test -r $f && return 0
+	test -n "$ARCHIVE" && f=$ARCHIVE/$1
+	test -r $f
+}
+findar() {
+	findf $1.tar.bz2 || findf $1.tar.gz || findf $1.tar.xz || findf $1.zip
+}
+# Set variables unless already defined. Vars are collected into $opts
+eset() {
+	local e k
+	for e in $@; do
+		k=$(echo $e | cut -d= -f1)
+		opts="$opts|$k"
+		test -n "$(eval echo \$$k)" || eval $e
+	done
+}
+
 cmd_env() {
-	test -n "$DISKIM_WORKSPACE" || DISKIM_WORKSPACE=$dir/tmp
-	test -n "$__kernel" || __kernel=$DISKIM_WORKSPACE/bzImage
-	test -n "$__initrd" || __initrd=$DISKIM_WORKSPACE/initrd.cpio
-	test "$cmd" = "mkimage" -o "$cmd" = "ximage" && return 0
-	test -n "$ARCHIVE" || ARCHIVE=$HOME/Downloads
-	mkdir -p $DISKIM_WORKSPACE $ARCHIVE
-	test -n "$__kver" || __kver=linux-5.18.1
-	test -n "$__kdir" || __kdir=$DISKIM_WORKSPACE/$__kver
-	test -n "$__kcfg" || __kcfg=$dir/config/$__kver
-	test -n "$__kobj" || __kobj=$DISKIM_WORKSPACE/obj
-	test -n "$__bbver" || __bbver=busybox-1.35.0
-	test -n "$__bbcfg" || __bbcfg=$dir/config/$__bbver
-	test "$cmd" = "env" && set | grep -E '^(__.*|ARCHIVE|DISKIM_WORKSPACE)='
+	eset \
+		DISKIM_WORKSPACE=/tmp/tmp/$USER/diskim \
+		KERNELDIR=$HOME/tmp/linux \
+		__kver=linux-6.14.2 \
+		__bbver=busybox-1.36.1 \
+		syslinuxver=syslinux-6.03
+		
+	WS=$DISKIM_WORKSPACE
+	eset \
+		__kernel=$WS/bzImage \
+		__initrd=$WS/initrd.cpio \
+		__kdir=$KERNELDIR/$__kver \
+		__kcfg=$dir/config/$__kver \
+		__kobj=$WS/$__kver-obj \
+		__bbcfg=$dir/config/$__bbver
+	if test "$cmd" = "env"; then
+		set | grep -E "^($opts)="
+		findar $__kver || log "WARNING: Kernel $__kver not downloaded"
+		findar $__bbver || log "WARNING: $__bbver not downloaded"
+		findar $syslinuxver || log "WARNING: $syslinuxver not downloaded"
+		exit 0
+	fi
+	mkdir -p $WS || die "Can't mkdir [$WS]"
 }
 
 cmd_release() {
-	test -n "$__version" || die "No version"
-	test -n "$1" || die "No out file"
-	cmd_env
+	test -n "$__version" || __version=$(date +%Y.%m.%d)
+	local out=$WS/diskim-$__version.tar
+	test -n "$1" && out=$1
 	local d=$tmp/diskim-$__version
 	mkdir -p $d/tmp
 	cp -R $me $dir/README.md $dir/test $d
 	cp $__kernel $__initrd $d/tmp
 	mkdir -p $d/tmp/$__bbver
-	cp $DISKIM_WORKSPACE/$__bbver/busybox $d/tmp/$__bbver
-	tar -C $tmp -cf "$1" diskim-$__version
+	cp $WS/$__bbver/busybox $d/tmp/$__bbver
+	rm -f $out $out.xz
+	tar -C $tmp -cf "$out" diskim-$__version || die tar
+	xz $out
+	log "Created [$out.xz]"
 }
 
-##   Bootstrap commands;
-##     bootstrap [--clean]
-##     kernel_download
+##   Build commands;
+##     build [--clean]
 ##     kernel_build [--kcfg=config] [--menuconfig]
 
-cmd_bootstrap() {
-	cmd_kernel_download
-	cmd_busybox_download
-	cmd_syslinux_download
+cmd_build() {
 	cmd_kernel_build
 	cmd_busybox_build
 	cmd_syslinux_unpack
 	cmd_initrd
 }
-cmd_kernel_download() {
-	cmd_env
-	local ar=$__kver.tar.xz
-	if test -r $ARCHIVE/$ar; then
-		echo "Already downloaded [$ar]"
-		return 0
-	fi
-	mkdir -p $ARCHIVE
-	local kbase=$(echo $__kver | cut -d '.' -f1 | sed -e 's,linux-,v,')
-	local burl=https://cdn.kernel.org/pub/linux/kernel/$kbase.x
-	curl -L $burl/$ar > $ARCHIVE/$ar || die "Download failed"
-}
 cmd_kernel_unpack() {
-	cmd_env
-	if test -e $__kdir; then
-		echo "Already unpacked [$__kdir]"
-		test -d $__kdir || die "Not a directory [$__kdir]"
-		return 0
-	fi
-	local ar=$ARCHIVE/$__kver.tar.xz
-	test -r $ar || die "Not readable [$ar]"
-	tar -C $(dirname $__kdir) -xf $ar
+	test -f $__kdir/Kbuild && return 0   # already unpacked
+	findar $__kver || die "Kernel $__kver not found"
+	log "Unpacking $f to $KERNELDIR"
+	tar -C $KERNELDIR -xf $f
 }
 cmd_kernel_build() {
-	cmd_env
+	test -r $__kcfg || die "Config not readable [$__kcfg]"
 	cmd_kernel_unpack
 	test "$__clean" = "yes" && rm -rf $__kobj
 	mkdir -p $__kobj
-	if test -r $__kcfg; then
-		cp $__kcfg $__kobj/.config
-	else
-		make -C $__kdir O=$__kobj allnoconfig
-		__menuconfig=yes
-	fi
+	cp $__kcfg $__kobj/.config
 
 	if test "$__menuconfig" = "yes"; then
 		make -C $__kdir O=$__kobj menuconfig
@@ -140,35 +149,17 @@ cmd_kernel_build() {
 	ln $__kobj/arch/x86/boot/bzImage $__kernel
 }
 
-##     busybox_download
 ##     busybox_build [--bbcfg=config] [--menuconfig]
 ##     busybox_install --dest=dir
-cmd_busybox_download() {
-	local url ar
-	cmd_env
-	ar=$ARCHIVE/$__bbver.tar.bz2
-	if test -r $ar; then
-		echo "Already downloaded [$ar]"
-	else
-		url=http://busybox.net/downloads/$__bbver.tar.bz2
-		curl -L $url > $ar || die "Could not download [$url]"
-	fi
-}
 cmd_busybox_build() {
-	cmd_env
-	local d=$DISKIM_WORKSPACE/$__bbver
+	test -r $__bbcfg || die "No BusyBox config [$__bbcfg]"
+	local d=$WS/$__bbver
 	test "$__clean" = "yes" && rm -rf $d
 	if ! test -d $d; then
-		cmd_busybox_download
-		tar -C $DISKIM_WORKSPACE -xf $ARCHIVE/$__bbver.tar.bz2 ||\
-			die "Failed to unpack [$ARCHIVE/$__bbver.tar.bz2]"
+		findar $__bbver || die "$__bbver not downloaded"
+		tar -C $WS -xf $f || die "Failed to unpack [$f]"
 	fi
-	if test -r $__bbcfg; then
-		cp $__bbcfg $d/.config
-	else
-		make -C $d allnoconfig
-		__menuconfig=yes
-	fi
+	cp $__bbcfg $d/.config
 
 	if test "$__menuconfig" = "yes"; then
 		make -C $d menuconfig
@@ -181,8 +172,7 @@ cmd_busybox_build() {
 }
 cmd_busybox_install() {
 	test -n "$__dest" || die "No --dest"
-	cmd_env
-	local bb=$DISKIM_WORKSPACE/$__bbver/busybox
+	local bb=$WS/$__bbver/busybox
 	test -x $bb || die "Not executable [$bb]"
 	local ld=/lib64/ld-linux-x86-64.so.2
 	test -x $ld || die "The loader not executable [$ld]"
@@ -192,31 +182,21 @@ cmd_busybox_install() {
 	cmd_cprel $ld
 	cmd_cplib $__dest/bin/*
 }
-
-##     syslinux_download
 ##     syslinux_unpack
-syslinuxver=syslinux-6.03
-cmd_syslinux_download() {
-	cmd_env
-	local ar=$syslinuxver.tar.xz
-	test -r $ARCHIVE/$ar && return 0
-	local baseurl=https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux
-	curl -L $baseurl/$ar > $ARCHIVE/$ar
-}
 cmd_syslinux_unpack() {
-	cmd_env
-	test -d $DISKIM_WORKSPACE/$syslinuxver && return 0
-	tar -C $DISKIM_WORKSPACE -xf $ARCHIVE/$syslinuxver.tar.xz
+	findar $syslinuxver || die "$syslinuxver not downloaded"
+	test -d $WS/$syslinuxver && return 0
+	log "Unpacking $syslinuxver ..."
+	tar -C $WS -xf $f
 }
 
 
 #   emit_initrd > initrd.cpio
 #     Test with; diskim.sh emit_initrd | cpio -t
 cmd_emit_initrd() {
-	cmd_env
 	local ld32=/lib/ld-linux.so.2
 	test -x $ld32 || die "The loader32 not executable [$ld32]"
-	local extlinux=$DISKIM_WORKSPACE/$syslinuxver/bios/extlinux/extlinux
+	local extlinux=$WS/$syslinuxver/bios/extlinux/extlinux
 	test -x $extlinux || die "Not executable [$extlinux]"
 
 	__dest=$tmp/rootfs
@@ -232,7 +212,6 @@ cmd_emit_initrd() {
 }
 ##     initrd [--initrd=file]
 cmd_initrd() {
-	cmd_env
 	mkdir -p $(dirname $__initrd)
 	cmd_emit_initrd > $__initrd
 }
@@ -267,7 +246,6 @@ cmd_cplib() {
 }
 ##     kvm --image=file [--iso=file] [kernel-params...]
 cmd_kvm() {
-	cmd_env
 	test -n "$__image" || die 'Not specified; --image'
 	test -r "$__image" || die "Not readable [$__image]"
 	test -f "$__image" || die "Not a file [$__image]"
@@ -424,9 +402,14 @@ while echo "$1" | grep -q '^--'; do
 		v=$(echo "$1" | cut -d= -f2-)
 		eval "$o=\"$v\""
 	else
+		if test "$1" = "--"; then
+			shift
+			break
+		fi
 		o=$(echo "$1" | sed -e 's,-,_,g')
 		eval "$o=yes"
 	fi
+	long_opts="$long_opts $o"
 	shift
 done
 unset o v
@@ -434,7 +417,7 @@ long_opts=`set | grep '^__' | cut -d= -f1`
 
 # Execute command
 trap "die Interrupted" INT TERM
-#mkdir -p $tmp
+cmd_env
 cmd_$cmd "$@"
 status=$?
 rmtmp
