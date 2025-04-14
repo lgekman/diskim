@@ -3,24 +3,22 @@
 prg=$(basename $0)
 dir=$(dirname $0); dir=$(readlink -f $dir)
 tmp=${TMPDIR:-/tmp}/${prg}_$$
-
+sh=$(readlink -f $dir/../../diskim.sh)
 die() {
 	echo "ERROR: $*" >&2
 	rm -rf $tmp
 	exit 1
 }
+eval $($sh env)
 
 test -n "$1" || die 'No file'
-test -n "$DISKIM_WORKSPACE" || die 'Not set $DISKIM_WORKSPACE'
-test -n "$__kobj" || die 'Not set $__kobj'
+test -x $sh || die "Not executable [$sh]"
 kernel=$__kobj/bzImage
 test -r $kernel || die "Not readable [$kernel]"
-diskim=$DISKIM_DIR/diskim.sh
-test -x $diskim || die "Not executable [$diskim]"
 
 mkdir -p $tmp
 cp -R $dir/rootfs/* $tmp
-$diskim busybox_install --dest=$tmp || die "Failed to install BusyBox"
+$sh busybox_install --dest=$tmp || die "Failed to install BusyBox"
 ln -s $kernel $tmp/boot/bzImage
 make -C $__kobj INSTALL_MOD_PATH=$tmp modules_install 1>&2 || \
 	die "Failed to install kernel modules"
